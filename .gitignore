@@ -1,8 +1,12 @@
-# Ignore Database storage directories
-Database/storage/
-Database/storage/*
-Database/chroma_db/
-Database/chroma_db/*
+# Ignore Database content but keep the structure
+Database/*
+!Database/Original_files/
+Database/Original_files/*
+!Database/Original_files/.gitkeep
+
+# Ignore ChromaDB data
+ChromaDB_code/chroma_db/
+ChromaDB_code/chroma_db/*
 
 # Python
 __pycache__/
