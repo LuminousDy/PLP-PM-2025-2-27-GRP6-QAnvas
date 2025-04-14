@@ -6,7 +6,7 @@ from core.db.mongodb import (
     assignment_collection, announcement_collection,
     course_collection
 )
-from core.api.canvas_api import HEADERS
+from core.api.canvas_api import HEADERS, get_file_download_url
 
 def process_folder_structure(course_id: Any, folders_data: List[Dict]) -> None:
     """
@@ -51,11 +51,16 @@ def store_file(file_item: Dict, course_id: Any) -> None:
     # Build file path information
     folder_path = file_item.get("folder", {}).get("full_name", "")
     filename = file_item.get("filename", "")
+    canvas_file_id = file_item.get("id")
+    canvas_course_id = file_item.get("course_id")
+    
+    print(f"Processing file: {filename} (ID: {canvas_file_id})")
     
     # Basic file information
     file_doc = {
         "course_id": course_id,
-        "canvas_id": file_item["id"],
+        "canvas_id": canvas_file_id,
+        "canvas_course_id": canvas_course_id,
         "filename": filename,
         "display_name": file_item.get("display_name", ""),
         "folder_path": folder_path,
@@ -68,20 +73,44 @@ def store_file(file_item: Dict, course_id: Any) -> None:
         "stored_at": datetime.now()
     }
     
-    # Download and store file if URL exists
-    if file_doc["url"]:
-        storage_result = storage.store_file(
-            file_doc["url"], 
-            str(course_id),
-            folder_path,
-            filename,
-            HEADERS
-        )
-        file_doc["storage_status"] = storage_result["status"]
-        if "stored_path" in storage_result:
-            file_doc["local_path"] = storage_result["stored_path"]
-        if "file_size" in storage_result:
-            file_doc["downloaded_size"] = storage_result["file_size"]
+    # Get authenticated download URL through Canvas API
+    if canvas_file_id and canvas_course_id:
+        # Get the authenticated file download URL from Canvas API
+        auth_download_url = get_file_download_url(canvas_file_id, canvas_course_id)
+        
+        if auth_download_url:
+            print(f"Got authenticated download URL for {filename}")
+            
+            # Download the file using the authenticated URL
+            storage_result = storage.store_file(
+                auth_download_url,
+                str(course_id),
+                folder_path,
+                filename,
+                {} # This URL already contains authentication, no additional headers needed
+            )
+            
+            file_doc["storage_status"] = storage_result["status"]
+            file_doc["used_auth_url"] = True
+            
+            if storage_result["status"] == "success":
+                print(f"Successfully downloaded {filename} using authenticated URL")
+                if "stored_path" in storage_result:
+                    file_doc["local_path"] = storage_result["stored_path"]
+                if "file_size" in storage_result:
+                    file_doc["downloaded_size"] = storage_result["file_size"]
+            else:
+                print(f"Failed to download using authenticated URL: {storage_result.get('error', 'Unknown error')}")
+                if "error" in storage_result:
+                    file_doc["storage_error"] = storage_result["error"]
+        else:
+            print(f"Could not get authenticated download URL for file {filename}")
+            file_doc["storage_status"] = "error"
+            file_doc["storage_error"] = "Failed to get authenticated download URL"
+    else:
+        print(f"Missing Canvas file ID or course ID for {filename}")
+        file_doc["storage_status"] = "error"
+        file_doc["storage_error"] = "Missing Canvas file ID or course ID"
     
     # Store in database
     file_collection.insert_one(file_doc)

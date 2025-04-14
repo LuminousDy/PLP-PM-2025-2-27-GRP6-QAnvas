@@ -97,6 +97,56 @@ def get_course_data(course_id: int) -> Dict[str, Any] or None:
                                 file_item['folder'] = folder
                                 break
                     
+                    # Ensure each file record contains the course ID for later download use
+                    file_item['course_id'] = course_id
+                    
+                    # Get download URL for each file
+                    try:
+                        print(f"Getting download URL for file: {file_item.get('display_name', 'Unknown')} (ID: {file_item.get('id')})")
+                        
+                        # Even if a URL already exists, fetch again to ensure complete download information
+                        file_id = file_item.get('id')
+                        if file_id:
+                            # Get file details, including download link
+                            file_url = f"{BASE_URL}/courses/{course_id}/files/{file_id}"
+                            print(f"Requesting file details from: {file_url}")
+                            
+                            # Using Session for better connection handling
+                            session = requests.Session()
+                            session.headers.update(HEADERS)
+                            file_response = session.get(file_url)
+                            
+                            if file_response.ok:
+                                file_details = file_response.json()
+                                
+                                # Store all available URLs for this file
+                                if 'url' in file_details:
+                                    file_item['url'] = file_details['url']
+                                    print(f"Got URL: {file_details['url']}")
+                                if 'download_url' in file_details:
+                                    file_item['download_url'] = file_details['download_url']
+                                    print(f"Got download_url: {file_details['download_url']}")
+                                    
+                                # Check for additional Canvas API specific fields
+                                for key in ['preview_url', 'canvadoc_url']:
+                                    if key in file_details:
+                                        file_item[key] = file_details[key]
+                                
+                                # If we still don't have a download URL, construct a direct one
+                                if not file_item.get('download_url') and not file_item.get('url'):
+                                    # Try to construct a direct download URL using the file ID
+                                    direct_download_url = f"{BASE_URL}/courses/{course_id}/files/{file_id}/download"
+                                    print(f"Constructed direct download URL: {direct_download_url}")
+                                    file_item['constructed_download_url'] = direct_download_url
+                                    
+                                print(f"Available URLs for {file_item.get('display_name', 'Unknown')}: {[k for k in file_item.keys() if 'url' in k]}")
+                            else:
+                                print(f"Failed to get file details. Status: {file_response.status_code}, Response: {file_response.text[:200]}")
+                                
+                            sleep(RATE_LIMIT_DELAY)  # Respect API rate limit
+                    except Exception as e:
+                        print(f"Error getting file details for file {file_item.get('id')}: {str(e)}")
+                    
             course_data[resource] = data
             
     return course_data
@@ -119,3 +169,33 @@ def get_all_available_courses() -> List[Dict]:
     ]
     
     return active_courses 
+
+def get_file_download_url(file_id: int, course_id: int) -> str or None:
+    """
+    Get the authenticated download URL for a file
+    This is the authenticated URL provided by Canvas API
+    """
+    try:
+        # Use the Canvas API's dedicated file download interface
+        download_url = f"{BASE_URL}/courses/{course_id}/files/{file_id}?include[]=download_url"
+        print(f"Getting authenticated download URL for file ID {file_id}")
+        
+        response = requests.get(download_url, headers=HEADERS)
+        if not response.ok:
+            print(f"Failed to get download URL. Status: {response.status_code}")
+            return None
+            
+        file_data = response.json()
+        
+        # Get the authenticated download link from Canvas API response
+        if "url" in file_data:
+            # This URL already contains authentication information
+            authenticated_url = file_data.get("url")
+            print(f"Got authenticated URL: {authenticated_url[:100]}...")
+            return authenticated_url
+        else:
+            print("No URL found in file data")
+            return None
+    except Exception as e:
+        print(f"Error getting download URL: {str(e)}")
+        return None 

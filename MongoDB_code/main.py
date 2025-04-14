@@ -9,7 +9,7 @@ def setup_environment():
     project_root = Path(__file__).resolve().parent.parent
     
     # Ensure Database directory exists
-    database_dir = project_root / "Database"
+    database_dir = project_root / "Files_Database"
     database_dir.mkdir(exist_ok=True)
     
     # Check for API key

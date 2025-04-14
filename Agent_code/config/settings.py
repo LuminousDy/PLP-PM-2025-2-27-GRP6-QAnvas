@@ -21,7 +21,7 @@ COLLECTION_NAMES = {
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "your_gemini_api_key")
 
 # File paths
-PDF_BASE_PATH = "Database/Original_files"
+PDF_BASE_PATH = "Files_Database"
 
 # Model settings
 GEMINI_MODEL_NAME = "gemini-2.0-flash"

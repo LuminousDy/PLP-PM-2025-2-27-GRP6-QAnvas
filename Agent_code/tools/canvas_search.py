@@ -2,7 +2,7 @@
 Canvas search implementation
 """
 from typing import Dict, List, Any, Optional
-from langchain_huggingface import HuggingFaceEmbeddings
+from sentence_transformers import SentenceTransformer
 from langchain_community.vectorstores import MongoDBAtlasVectorSearch
 from langchain_google_genai import ChatGoogleGenerativeAI
 from models.data_models import SearchPath, SearchResult
@@ -21,6 +21,19 @@ import os
 from pymongo import MongoClient, ASCENDING, TEXT
 import json
 import re
+import numpy as np
+import torch
+from rank_bm25 import BM25Okapi
+from nltk.tokenize import word_tokenize
+import nltk
+from datetime import datetime
+from functools import lru_cache
+
+# Download NLTK data for tokenization
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
 
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -43,12 +56,12 @@ class CanvasSearcher:
             collection_names = self.db.list_collection_names()
             print(f"Available collections: {collection_names}")
             
-            # Initialize embeddings model
-            self.embeddings = HuggingFaceEmbeddings(
-                model_name=EMBEDDING_MODEL_NAME,
-                model_kwargs={'device': 'cpu'},
-                encode_kwargs={'normalize_embeddings': True}
-            )
+            # Check for GPU availability
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            print(f"Using device: {device} for embedding model")
+            
+            # Initialize embeddings model using SentenceTransformer with GPU if available
+            self.model = SentenceTransformer(EMBEDDING_MODEL_NAME, device=device)
             
             # Initialize LLM for path decision
             self.llm = ChatGoogleGenerativeAI(
@@ -76,7 +89,7 @@ class CanvasSearcher:
 
     def search(self, query: str) -> Dict[str, Any]:
         """
-        Search Canvas content based on query using both text and vector search
+        Search Canvas content based on query using hybrid search (keyword + vector)
         """
         try:
             # Determine which collections to search based on query
@@ -137,79 +150,9 @@ class CanvasSearcher:
                         else:
                             continue
                         
-                    # Prepare texts for embedding search based on collection type
-                    texts_to_embed = []
-                    doc_map = {}  # Map to store original documents
-                    
-                    for doc in matching_docs:
-                        if collection_name == COLLECTION_NAMES["announcements"]:
-                            text = f"{doc.get('title', '')} {doc.get('message', '')}"
-                            fields_to_keep = COLLECTION_FIELDS["announcements"]
-                        elif collection_name == COLLECTION_NAMES["assignments"]:
-                            text = f"{doc.get('name', '')} {doc.get('description', '')}"
-                            fields_to_keep = COLLECTION_FIELDS["assignments"]
-                        elif collection_name == COLLECTION_NAMES["files"]:
-                            text = f"{doc.get('filename', '')} {doc.get('folder_path', '')}"
-                            fields_to_keep = COLLECTION_FIELDS["files"]
-                        else:
-                            continue
-                            
-                        if text.strip():  # Only process non-empty texts
-                            texts_to_embed.append(text)
-                            # Create a filtered document with only the required fields
-                            filtered_doc = {k: doc.get(k) for k in fields_to_keep if k in doc}
-                            filtered_doc["source"] = collection_name
-                            doc_map[text] = filtered_doc
-                    
-                    if not texts_to_embed:
-                        print(f"No valid texts to embed found in {collection_name}")
-                        continue
-                        
-                    print(f"Processing {len(texts_to_embed)} texts for embedding in {collection_name}")
-                    
-                    # Generate embeddings for query and texts
-                    try:
-                        query_embedding = self.embeddings.embed_query(query)
-                        doc_embeddings = self.embeddings.embed_documents(texts_to_embed)
-                        
-                        # Calculate cosine similarity
-                        from numpy import dot
-                        from numpy.linalg import norm
-                        import numpy as np
-                        
-                        similarities = []
-                        for idx, doc_embedding in enumerate(doc_embeddings):
-                            # Convert to numpy arrays if they aren't already
-                            query_embedding_np = np.array(query_embedding)
-                            doc_embedding_np = np.array(doc_embedding)
-                            
-                            # Calculate cosine similarity
-                            similarity = dot(query_embedding_np, doc_embedding_np) / (
-                                norm(query_embedding_np) * norm(doc_embedding_np)
-                            )
-                            similarities.append((similarity, texts_to_embed[idx]))
-                        
-                        # Sort by similarity and get top 2
-                        similarities.sort(reverse=True)
-                        top_results = similarities[:2]
-                        
-                        # Add top results to final results
-                        for similarity, text in top_results:
-                            if text in doc_map:
-                                result_doc = doc_map[text].copy()  # Create a copy to avoid modifying the original
-                                result_doc["score"] = float(similarity)
-                                result_doc["matched_text"] = text
-                                # Convert ObjectId to string
-                                if "_id" in result_doc:
-                                    result_doc["_id"] = str(result_doc["_id"])
-                                if "course_id" in result_doc:
-                                    result_doc["course_id"] = str(result_doc["course_id"])
-                                results.append(result_doc)
-                                print(f"Added result from {collection_name} with score {similarity}")
-                                
-                    except Exception as e:
-                        print(f"Error during embedding search for {collection_name}: {str(e)}")
-                        continue
+                    # Perform hybrid search on documents
+                    hybrid_results = self._hybrid_search(query, matching_docs, collection_name)
+                    results.extend(hybrid_results)
                         
                 except Exception as e:
                     print(f"Error processing collection {collection_name}: {str(e)}")
@@ -219,12 +162,228 @@ class CanvasSearcher:
             return {
                 "error": None,
                 "search_path": search_path,
-                "results": results  # Already limited to top 2 per collection
+                "results": results
             }
             
         except Exception as e:
             print(f"Error during search: {str(e)}")
             return {"error": str(e), "search_path": None, "results": []}
+
+    def _hybrid_search(self, query: str, documents: List[Dict], collection_name: str, top_k: int = 2) -> List[Dict]:
+        """
+        Perform hybrid search combining BM25 keyword search with vector semantic search
+        
+        Args:
+            query: User query
+            documents: List of documents to search
+            collection_name: Name of collection being searched
+            top_k: Number of top results to return
+            
+        Returns:
+            List of search results with scores
+        """
+        try:
+            # Prepare texts for embedding and BM25 search
+            texts_to_embed = []
+            doc_map = {}
+            
+            for doc in documents:
+                if collection_name == COLLECTION_NAMES["announcements"]:
+                    text = f"{doc.get('title', '')} {doc.get('message', '')}"
+                    fields_to_keep = COLLECTION_FIELDS["announcements"]
+                elif collection_name == COLLECTION_NAMES["assignments"]:
+                    text = f"{doc.get('name', '')} {doc.get('description', '')}"
+                    fields_to_keep = COLLECTION_FIELDS["assignments"]
+                elif collection_name == COLLECTION_NAMES["files"]:
+                    text = f"{doc.get('filename', '')} {doc.get('folder_path', '')}"
+                    fields_to_keep = COLLECTION_FIELDS["files"]
+                else:
+                    continue
+                    
+                if text.strip():  # Only process non-empty texts
+                    texts_to_embed.append(text)
+                    # Create a filtered document with only the required fields
+                    filtered_doc = {k: doc.get(k) for k in fields_to_keep if k in doc}
+                    filtered_doc["source"] = collection_name
+                    doc_map[text] = filtered_doc
+            
+            if not texts_to_embed:
+                print(f"No valid texts to embed found in {collection_name}")
+                return []
+                
+            print(f"Processing {len(texts_to_embed)} texts for hybrid search in {collection_name}")
+            
+            # 1. Perform BM25 keyword search
+            bm25_results = self._perform_bm25_search(query, texts_to_embed, top_k=top_k*2)
+            
+            # 2. Perform vector similarity search
+            vector_results = self._perform_vector_search(query, texts_to_embed, top_k=top_k*2)
+            
+            # 3. Combine and rerank results
+            hybrid_results = self._combine_search_results(
+                bm25_results, 
+                vector_results, 
+                texts_to_embed, 
+                doc_map, 
+                top_k=top_k
+            )
+            
+            return hybrid_results
+                
+        except Exception as e:
+            print(f"Error during hybrid search: {str(e)}")
+            return []
+    
+    def _perform_bm25_search(self, query: str, texts: List[str], top_k: int = 4) -> List[Dict]:
+        """
+        Perform BM25 keyword search on texts
+        
+        Args:
+            query: User query
+            texts: List of text documents to search
+            top_k: Number of top results to return
+            
+        Returns:
+            List of (index, score) tuples for top results
+        """
+        try:
+            # Tokenize corpus for BM25
+            tokenized_corpus = [word_tokenize(text.lower()) for text in texts]
+            tokenized_query = word_tokenize(query.lower())
+            
+            # Create BM25 model
+            bm25 = BM25Okapi(tokenized_corpus)
+            
+            # Get BM25 scores
+            bm25_scores = bm25.get_scores(tokenized_query)
+            
+            # Get top-k indices
+            top_indices = np.argsort(-bm25_scores)[:top_k]
+            
+            # Return indices and scores
+            return [(idx, bm25_scores[idx]) for idx in top_indices if bm25_scores[idx] > 0]
+        
+        except Exception as e:
+            print(f"Error during BM25 search: {str(e)}")
+            return []
+    
+    def _perform_vector_search(self, query: str, texts: List[str], top_k: int = 4) -> List[Dict]:
+        """
+        Perform vector similarity search on texts
+        
+        Args:
+            query: User query
+            texts: List of text documents to search
+            top_k: Number of top results to return
+            
+        Returns:
+            List of (index, score) tuples for top results
+        """
+        try:
+            # Encode query with query prompt
+            query_embedding = self.model.encode([query], prompt_name="query", 
+                                              show_progress_bar=False)[0]
+            
+            # Encode documents in batches
+            batch_size = 32  # Adjust based on GPU memory
+            doc_embeddings = []
+            
+            for i in range(0, len(texts), batch_size):
+                batch = texts[i:i+batch_size]
+                batch_embeddings = self.model.encode(batch, show_progress_bar=False)
+                doc_embeddings.extend(batch_embeddings)
+                
+            doc_embeddings = np.array(doc_embeddings)
+            
+            # Normalize embeddings for cosine similarity
+            query_embedding = query_embedding / np.linalg.norm(query_embedding)
+            doc_embeddings = doc_embeddings / np.linalg.norm(doc_embeddings, axis=1)[:, np.newaxis]
+            
+            # Calculate similarities using vectorized operations
+            similarities = np.dot(doc_embeddings, query_embedding)
+            
+            # Sort and get top results
+            top_indices = np.argsort(-similarities)[:top_k]
+            
+            # Return indices and scores
+            return [(idx, float(similarities[idx])) for idx in top_indices if similarities[idx] > 0]
+            
+        except Exception as e:
+            print(f"Error during vector search: {str(e)}")
+            return []
+    
+    def _combine_search_results(self, bm25_results: List[tuple], vector_results: List[tuple], 
+                               texts: List[str], doc_map: Dict, top_k: int = 2) -> List[Dict]:
+        """
+        Combine and rerank BM25 and vector search results
+        
+        Args:
+            bm25_results: List of (index, score) tuples from BM25 search
+            vector_results: List of (index, score) tuples from vector search
+            texts: Original texts used for search
+            doc_map: Mapping from text to document data
+            top_k: Number of top results to return
+            
+        Returns:
+            Combined and reranked search results
+        """
+        try:
+            # Create a combined score map
+            combined_scores = {}
+            
+            # Add BM25 scores (normalized between 0 and 1)
+            bm25_max = max([score for _, score in bm25_results]) if bm25_results else 1.0
+            for idx, score in bm25_results:
+                normalized_score = score / bm25_max
+                combined_scores[idx] = {"bm25_score": normalized_score, "vector_score": 0, "index": idx}
+            
+            # Add vector scores (already between 0 and 1)
+            for idx, score in vector_results:
+                if idx in combined_scores:
+                    combined_scores[idx]["vector_score"] = score
+                else:
+                    combined_scores[idx] = {"bm25_score": 0, "vector_score": score, "index": idx}
+            
+            # Calculate combined score (weighted average)
+            # Here we weight vector search higher (0.7) than keyword search (0.3)
+            for idx in combined_scores:
+                combined_scores[idx]["combined_score"] = (
+                    0.3 * combined_scores[idx]["bm25_score"] + 
+                    0.7 * combined_scores[idx]["vector_score"]
+                )
+            
+            # Sort by combined score
+            sorted_results = sorted(
+                combined_scores.values(), 
+                key=lambda x: x["combined_score"], 
+                reverse=True
+            )[:top_k]
+            
+            # Convert to final results format
+            final_results = []
+            for result in sorted_results:
+                idx = result["index"]
+                text = texts[idx]
+                if text in doc_map:
+                    result_doc = doc_map[text].copy()
+                    result_doc["score"] = result["combined_score"]
+                    result_doc["vector_score"] = result["vector_score"]
+                    result_doc["keyword_score"] = result["bm25_score"]
+                    result_doc["matched_text"] = text
+                    
+                    # Convert ObjectId to string
+                    if "_id" in result_doc:
+                        result_doc["_id"] = str(result_doc["_id"])
+                    if "course_id" in result_doc:
+                        result_doc["course_id"] = str(result_doc["course_id"])
+                        
+                    final_results.append(result_doc)
+            
+            return final_results
+            
+        except Exception as e:
+            print(f"Error combining search results: {str(e)}")
+            return []
 
     def _determine_search_path(self, query: str) -> Dict[str, List[str]]:
         """Determine which modules and courses to search based on the query using LLM"""
@@ -263,40 +422,49 @@ Only return the JSON object, no other text."""
             if response.endswith('```'):
                 response = response[:-3]
             
-            # Parse JSON response
+            # Further cleaning to handle potential formatting issues
+            response = response.strip()
+            
+            # Try to extract JSON object if wrapped in other text
             try:
-                result = json.loads(response)
-                
-                # Validate modules
-                if not isinstance(result.get("modules", []), list):
-                    result["modules"] = []
-                result["modules"] = [m for m in result["modules"] if m in AVAILABLE_MODULES]
-                
-                # Validate courses
-                if not isinstance(result.get("courses", []), list):
-                    result["courses"] = []
-                result["courses"] = [c for c in result["courses"] if c in AVAILABLE_COURSES]
-                
-                # Ensure reasoning exists
-                if not isinstance(result.get("reasoning", ""), str):
-                    result["reasoning"] = "No reasoning provided"
-                
-                return result
-                
+                json_start = response.find('{')
+                json_end = response.rfind('}') + 1
+                if json_start >= 0 and json_end > 0:
+                    json_str = response[json_start:json_end]
+                    data = json.loads(json_str)
+                else:
+                    data = json.loads(response)
             except json.JSONDecodeError:
-                print(f"Error parsing LLM response: {response}")
-                # Fallback to default behavior
+                print(f"JSON decode error: {response}")
+                # Fallback to a basic search across all modules if parsing fails
                 return {
-                    "modules": AVAILABLE_MODULES.copy(),
+                    "modules": AVAILABLE_MODULES,
                     "courses": [],
-                    "reasoning": "Failed to parse LLM response, using all modules as fallback"
+                    "reasoning": "Failed to parse search path, using all modules as fallback"
                 }
+            
+            # Validate expected fields
+            if "modules" not in data or not isinstance(data["modules"], list):
+                data["modules"] = []
+            if "courses" not in data or not isinstance(data["courses"], list):
+                data["courses"] = []
+            if "reasoning" not in data or not isinstance(data["reasoning"], str):
+                data["reasoning"] = "No reasoning provided"
                 
+            # Ensure module and course names are valid
+            data["modules"] = [m for m in data["modules"] if m in AVAILABLE_MODULES]
+            data["courses"] = [c for c in data["courses"] if c in AVAILABLE_COURSES]
+            
+            # Log search path decision
+            print(f"Determined search path: {data}")
+            
+            return data
+            
         except Exception as e:
-            print(f"Error in path determination: {str(e)}")
-            # Fallback to default behavior
+            print(f"Error determining search path: {str(e)}")
+            # Fallback to searching all modules
             return {
-                "modules": AVAILABLE_MODULES.copy(),
+                "modules": AVAILABLE_MODULES,
                 "courses": [],
-                "reasoning": f"Error in LLM path determination: {str(e)}"
+                "reasoning": f"Error determining path: {str(e)}"
             }
