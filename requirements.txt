@@ -1,0 +1,23 @@
+# Canvas API and HTTP requests
+requests>=2.31.0
+canvasapi>=3.0.0
+
+# MongoDB related
+pymongo>=4.4.0
+motor>=3.2.0  # Async MongoDB driver
+
+# LLM and AI related
+google-generativeai>=0.3.0  # Gemini API
+langchain>=0.1.0
+langchain-google-genai>=0.0.5
+sentence-transformers>=2.2.2  # Vector embeddings
+
+# PDF processing
+pypdf>=3.15.1
+pdfplumber>=0.10.2
+
+# Tools and utility libraries
+python-dotenv>=1.0.0  # Environment variable management
+tqdm>=4.66.1  # Progress bar
+numpy>=1.24.0
+pandas>=2.0.0 
