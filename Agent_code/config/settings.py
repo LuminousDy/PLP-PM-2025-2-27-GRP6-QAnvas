@@ -42,7 +42,8 @@ AVAILABLE_MODULES = [
 def get_available_courses() -> List[str]:
     """Dynamically load available courses from MongoDB"""
     try:
-        client = MongoClient(MONGODB_URI)
+        client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=3000)
+        client.server_info()
         db = client[MONGODB_DB_NAME]
         courses_collection = db[COLLECTION_NAMES["courses"]]
         courses = list(courses_collection.find({}, {"course_name": 1, "_id": 0}))

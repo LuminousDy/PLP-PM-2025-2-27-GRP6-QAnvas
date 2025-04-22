@@ -1,8 +1,21 @@
-from pymongo import MongoClient
+from pymongo import MongoClient, errors
+import os
 
 # Initialize MongoDB connection
-mongo_client = MongoClient("mongodb://localhost:27017/")
-db = mongo_client["canvas_qa_system"]
+try:
+    mongo_client = MongoClient(os.getenv("MONGODB_URI"), serverSelectionTimeoutMS=3000)
+    mongo_client.server_info()
+    db = mongo_client["canvas_qa_system"]
+except errors.ServerSelectionTimeoutError as e:
+    print("Unable to connect to MongoDB. The service may not be running.")
+    print("Error message:", e)
+    db = None
+    exit(1)
+except Exception as e:
+    print("An error occurred while connecting to MongoDB.")
+    print("Error message:", e)
+    db = None
+    exit(1)
 
 # Collections for different data types
 course_collection = db["courses"]

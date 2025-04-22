@@ -2,10 +2,17 @@ import os
 import requests
 from time import sleep
 from typing import List, Dict, Any
+from dotenv import load_dotenv
+load_dotenv()
 
 # API Configuration
-BASE_URL = "https://canvas.nus.edu.sg/api/v1"
-HEADERS = {"Authorization": f"Bearer {os.getenv('DINGYI_CANVAS_API_KEY')}"}
+BASE_URL = os.getenv('CANVAS_API_URL')
+HEADERS = {"Authorization": f"Bearer {os.getenv('CANVAS_API_TOKEN')}"}
+if not BASE_URL or not HEADERS["Authorization"]:
+    raise EnvironmentError(
+        "CANVAS_API_URL or CANVAS_API_TOKEN environment variable not set. "
+        "Please set them before running the script."
+    )
 PAGE_SIZE = 100
 RATE_LIMIT_DELAY = 0.1  # Delay between API calls to avoid rate limiting
 

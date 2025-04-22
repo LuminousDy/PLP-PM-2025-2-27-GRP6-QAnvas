@@ -1,6 +1,7 @@
 """
 Canvas search implementation
 """
+import os
 from typing import Dict, List, Any, Optional
 from sentence_transformers import SentenceTransformer
 from langchain_community.vectorstores import MongoDBAtlasVectorSearch
@@ -45,7 +46,7 @@ class CanvasSearcher:
         """Initialize MongoDB connection and models"""
         try:
             # Initialize MongoDB connection
-            self.client = MongoClient(MONGODB_URI)
+            self.client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=3000)
             self.db = self.client[MONGODB_DB_NAME]
             
             # Verify database connection and collections
@@ -85,6 +86,10 @@ class CanvasSearcher:
             print("Successfully connected to MongoDB and initialized models")
         except Exception as e:
             print(f"Error during initialization: {str(e)}")
+            # self.client = None
+            # self.db = None
+            # self.model = None
+            # self.llm = None
             raise
 
     def search(self, query: str) -> Dict[str, Any]:

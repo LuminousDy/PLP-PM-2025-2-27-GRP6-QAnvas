@@ -1,11 +1,47 @@
 import os
-from pymongo import MongoClient
+from pymongo import MongoClient, errors
 import requests
 from time import sleep
 from datetime import datetime
 from typing import List, Dict, Any
 from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv()
 
+# Initialize MongoDB connection
+try:
+    mongo_client = MongoClient(os.getenv("MONGODB_URI"), serverSelectionTimeoutMS=3000)
+    mongo_client.server_info()
+    db = mongo_client["canvas_qa_system"]
+except errors.ServerSelectionTimeoutError as e:
+    print("Unable to connect to MongoDB. The service may not be running.")
+    print("Error message:", e)
+    db = None
+    exit(1)
+except Exception as e:
+    print("An error occurred while connecting to MongoDB.")
+    print("Error message:", e)
+    db = None
+    exit(1)
+
+# Collections for different data types
+course_collection = db["courses"]
+file_collection = db["files"]
+folder_collection = db["folders"]  # New collection for folders
+assignment_collection = db["assignments"]
+announcement_collection = db["announcements"]
+query_log_collection = db["query_logs"]
+
+# Create indexes for better query performance
+folder_collection.create_index([("course_id", 1), ("full_path", 1)])
+file_collection.create_index([("course_id", 1), ("folder_path", 1)])
+file_collection.create_index([("course_id", 1), ("canvas_id", 1)])
+
+# API Configuration
+BASE_URL = os.getenv("CANVAS_API_URL", )
+HEADERS = {"Authorization": f"Bearer {os.getenv('CANVAS_API_TOKEN')}"}
+PAGE_SIZE = 100
+RATE_LIMIT_DELAY = 0.1  # Delay between API calls to avoid rate limiting
 class FileStorage:
     def __init__(self, base_path: str = "./storage"):
         """
@@ -81,29 +117,6 @@ class FileStorage:
                 "status": "error",
                 "error": str(e)
             }
-
-# Initialize MongoDB connection
-mongo_client = MongoClient("mongodb://localhost:27017/")
-db = mongo_client["canvas_qa_system"]
-
-# Collections for different data types
-course_collection = db["courses"]
-file_collection = db["files"]
-folder_collection = db["folders"]  # New collection for folders
-assignment_collection = db["assignments"]
-announcement_collection = db["announcements"]
-query_log_collection = db["query_logs"]
-
-# Create indexes for better query performance
-folder_collection.create_index([("course_id", 1), ("full_path", 1)])
-file_collection.create_index([("course_id", 1), ("folder_path", 1)])
-file_collection.create_index([("course_id", 1), ("canvas_id", 1)])
-
-# API Configuration
-BASE_URL = "https://canvas.nus.edu.sg/api/v1"
-HEADERS = {"Authorization": f"Bearer {os.getenv('DINGYI_CANVAS_API_KEY')}"}
-PAGE_SIZE = 100
-RATE_LIMIT_DELAY = 0.1  # Delay between API calls to avoid rate limiting
 
 def get_paginated_results(url: str) -> List[Dict[Any, Any]] or None:
     """

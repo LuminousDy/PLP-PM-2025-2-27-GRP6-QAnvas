@@ -2,10 +2,12 @@ import os
 from pathlib import Path
 from core.api.canvas_api import get_all_available_courses, get_course_data
 from core.processors.data_processors import store_course_data
-
+from dotenv import load_dotenv
+load_dotenv()
 def setup_environment():
     """Setup necessary directories and environment variables"""
     # Get the project root directory
+    print("Setting up environment...")
     project_root = Path(__file__).resolve().parent.parent
     
     # Ensure Database directory exists
@@ -13,9 +15,9 @@ def setup_environment():
     database_dir.mkdir(exist_ok=True)
     
     # Check for API key
-    if not os.getenv('DINGYI_CANVAS_API_KEY'):
+    if not os.getenv('CANVAS_API_TOKEN'):
         raise EnvironmentError(
-            "DINGYI_CANVAS_API_KEY environment variable not set. "
+            "CANVAS_API_TOKEN environment variable not set. "
             "Please set it before running the script."
         )
 
