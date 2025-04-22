@@ -28,7 +28,7 @@ from nltk.tokenize import word_tokenize
 import nltk
 from datetime import datetime
 from functools import lru_cache
-
+from mutli_intents_decomposition import prompt_analyze
 # Download NLTK data for tokenization
 try:
     nltk.data.find('tokenizers/punkt')
@@ -387,9 +387,11 @@ class CanvasSearcher:
 
     def _determine_search_path(self, query: str) -> Dict[str, List[str]]:
         """Determine which modules and courses to search based on the query using LLM"""
+        
         try:
             # Construct prompt for LLM
             prompt = f"""Given a user query about Canvas content, determine which modules and courses to search in.
+            
 
 Available Modules:
 {', '.join(AVAILABLE_MODULES)}
@@ -411,6 +413,7 @@ Return your decision as a valid JSON object with this format:
 }}
 
 Only return the JSON object, no other text."""
+
 
             # Get LLM response
             response = self.llm.predict(prompt)
