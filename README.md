@@ -1,8 +1,8 @@
 # QAnvas - Canvas Learning Management System Q&A Assistant
 
-QAnvas is an intelligent Q&A system for the Canvas Learning Management System that combines advanced data retrieval capabilities with natural language processing to provide users with a powerful tool for accessing course information.
+> QAnvas is an intelligent Q&A system for the Canvas Learning Management System that combines advanced data retrieval capabilities with natural language processing to provide users with a powerful tool for accessing course information.
 
-## Project Overview
+## 1. Project Overview
 
 QAnvas consists of two main modules:
 
@@ -11,25 +11,29 @@ QAnvas consists of two main modules:
 
 This project aims to simplify the process of retrieving information from Canvas learning management system, enabling users to easily access course content, assignment information, announcements, and more through natural language queries.
 
-## Core Features
 
-### Data Collection and Storage
+
+## 2. Core Features
+
+### 2.1 Data Collection and Storage
 - Retrieve course information, folders, files, assignments, and announcements via Canvas API
 - Store data in a structured MongoDB database
 - Support local storage and retrieval of file content
 - Handle paginated results and nested folder structures
 - Automatically track resource updates and version management
 
-### Intelligent Q&A System
+### 2.2 Intelligent Q&A System
 - Use Google Gemini 2.0 Flash model for natural language processing
 - Vector search technology for finding semantically related content
 - Intelligently determine search scope and relevant courses
 - PDF document analysis and content extraction
 - Complex query processing based on ReAct agent architecture
 
-## Technical Architecture
 
-### Database Structure
+
+## 3. Technical Architecture
+
+### 3.1 Database Structure
 MongoDB database `canvas_qa_system` contains the following collections:
 - `courses`: Stores basic course information
 - `folders`: Stores folder structures
@@ -38,13 +42,15 @@ MongoDB database `canvas_qa_system` contains the following collections:
 - `announcements`: Stores announcement information
 - `query_logs`: Stores query logs
 
-### System Components
+### 3.2 System Components
 - **LLM Engine**: Uses Google Gemini 2.0 Flash model
 - **Vector Search**: Uses SentenceTransformer to generate text embeddings
 - **MongoDB Integration**: Connects to a MongoDB database storing Canvas data
 - **Langchain Framework**: Used for building ReAct agents and tool integration
 
-## Project Structure
+
+
+## 4. Project Structure
 
 ```
 QAnvas/
@@ -71,16 +77,18 @@ QAnvas/
 │   └── Agent_Module_Summary.md
 ```
 
-## Key Implementation Details
 
-### Pagination Handling
+
+## 5. Key Implementation Details
+
+### 5.1 Pagination Handling
 Canvas API interfaces typically return paginated data, which our system handles by:
 - Automatically detecting and processing Canvas API's `Link` header information
 - Recursively or iteratively requesting all available pages
 - Merging paginated results into a single dataset
 - Implementing backpressure mechanisms to prevent request overload
 
-### Vector Search Implementation
+### 5.2 Vector Search Implementation
 ```python
 # Generate embedding for query
 query_embedding = self.model.encode([query], prompt_name="query", 
@@ -97,7 +105,7 @@ similarities = np.dot(normalized_doc_embeddings, normalized_query_embedding)
 top_indices = np.argsort(-similarities)[:top_k]
 ```
 
-### ReAct Agent Implementation
+### 5.3 ReAct Agent Implementation
 ```python
 self.agent = create_react_agent(
     llm=self.llm,
@@ -114,14 +122,16 @@ self.agent_executor = AgentExecutor(
 )
 ```
 
-## Usage Flow
 
-### Data Collection
+
+## 6. Usage Flow
+
+### 6.1 Data Collection
 1. Configure Canvas API access
 2. Run the MongoDB module to collect course data
 3. Verify that data has been successfully stored in MongoDB
 
-### Q&A Function
+### 6.2 Q&A Function
 ```python
 agent = CanvasQAAgent()
 query = "When is my data analysis assignment due?"
@@ -129,7 +139,37 @@ answer = agent.answer_query(query)
 print(answer)
 ```
 
-## Optimization and Performance
+
+
+## 7. Installation and Usage
+
+**Prerequisites**:
+- Python 3.9+
+- MongoDB 4.4+
+- Canvas API access token
+
+**Get Started**:
+
+1. Clone the repository
+   ```
+   git clone https://github.com/LuminousDy/PLP-PM-2025-2-27-GRP6-QAnvas.git
+   cd PLP-PM-2025-2-27-GRP6-QAnvas
+   ```
+2. Install dependencies: `pip install -r requirements.txt`
+3. Configure environment variables or `.env` file (get token from Canvas -> Account -> Settings -> Approved integrations -> New Access Token):
+   ```
+   CANVAS_API_URL=https://your-canvas-instance.com/api/v1
+   CANVAS_API_TOKEN=your_canvas_api_token
+   MONGODB_CONNECTION_STRING=mongodb://localhost:27017
+   GOOGLE_API_KEY=your_google_api_key
+   ```
+4. Launch MongoDB service on port 27017
+5. Run the data collection module: `python MongoDB_code/main.py`
+6. Start the Q&A agent: `python Agent_code/main.py`
+
+
+
+## 8. Optimization and Performance
 - Batch processing to improve embedding generation efficiency
 - Support for GPU acceleration of embedding models (if CUDA is available)
 - Creating indexes on MongoDB collections to improve query performance
@@ -137,26 +177,8 @@ print(answer)
 - Implementing caching mechanisms to reduce repeated API requests
 - Using connection pools to optimize database connections
 
-## Installation and Configuration
 
-### Prerequisites
-- Python 3.8+
-- MongoDB 4.4+
-- Canvas API access token
 
-### Installation Steps
-1. Clone the repository
-2. Install dependencies: `pip install -r requirements.txt`
-3. Configure environment variables or `.env` file:
-   ```
-   CANVAS_API_URL=https://your-canvas-instance.com/api/v1
-   CANVAS_API_TOKEN=your_canvas_api_token
-   MONGODB_CONNECTION_STRING=mongodb://localhost:27017
-   GOOGLE_API_KEY=your_google_api_key
-   ```
-4. Run the data collection module: `python MongoDB_code/main.py`
-5. Start the Q&A agent: `python Agent_code/main.py`
-
-## Summary
+## 9. Summary
 
 QAnvas provides a powerful natural language interface for the Canvas learning management system, enabling users to easily access course-related information. It combines modern LLM technology, vector search, and structured database queries to offer an intelligent assistant solution for educational environments. By determining the most relevant search paths and using precise search tools, the agent can deliver accurate and helpful responses tailored to user queries. 
