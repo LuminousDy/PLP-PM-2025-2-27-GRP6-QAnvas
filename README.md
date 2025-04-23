@@ -194,7 +194,7 @@ print(answer)
 - Implementing caching mechanisms to reduce repeated API requests
 - Using connection pools to optimize database connections
 
-## 9. Multi-Intent Query Decomposition with T5
+## 9. Multi-Intent Query Decomposition with T5 (Optional)
 
 This repository contains the code and training instructions for fine-tuning a T5-based model to perform **multi-intent query decomposition** — converting natural user queries into structured sub-queries, each with its associated semantic intent.
 
