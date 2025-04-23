@@ -208,9 +208,16 @@ The dataset is available for download from:
 
 ## Model
 The finetuned model for download from:
+
 🔗 [T5 specific for query decompostion-after finetuned](https://drive.google.com/drive/folders/1MZUM5gPLVdk6LgtQ8nEBnXUyiMmcYbg6?usp=drive_link)
 
+and put it under the 
+'''
+QAnvas/
+├──Multi_Intents_code
+│ ├── checkpoints/
 
+'''
 ## 10. Summary
 
 QAnvas provides a powerful natural language interface for the Canvas learning management system, enabling users to easily access course-related information. It combines modern LLM technology, vector search, and structured database queries to offer an intelligent assistant solution for educational environments. By determining the most relevant search paths and using precise search tools, the agent can deliver accurate and helpful responses tailored to user queries. 
