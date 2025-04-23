@@ -1,8 +1,6 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-model = AutoModelForSeq2SeqLM.from_pretrained("path_to_your_model")
-tokenizer = AutoTokenizer.from_pretrained("path_to_your_model")
 
 def parse_multi_intent_output(output_text, original_query, query_id=0):
     segments = output_text.strip().split(" | ")
@@ -58,7 +56,7 @@ def prompt_analyze(input_text, model, tokenizer, max_length=128):
     input_ids = tokenizer(input_text, return_tensors="pt").input_ids
     outputs = model.generate(input_ids, max_length=max_length)
     decoded_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
+    
     # Parse structured output
     query_store = parse_multi_intent_output(decoded_output, original_query=input_text)
     prompts = [q['text'] for q in query_store['sub_queries']]
