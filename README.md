@@ -74,6 +74,7 @@ QAnvas/
 │   ├── tools/
 │   │   ├── canvas_search.py     # Canvas content search functionality
 │   │   └── pdf_analyzer.py      # PDF document analysis functionality
+│   │   └── mutil_intents_analyze.py      # Query analysis and spliting
 │   └── Agent_Module_Summary.md
 ```
 
