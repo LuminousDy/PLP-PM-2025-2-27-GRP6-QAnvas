@@ -194,8 +194,20 @@ print(answer)
 - Implementing caching mechanisms to reduce repeated API requests
 - Using connection pools to optimize database connections
 
+## 9. Multi-Intent Query Decomposition with T5
+
+This repository contains the code and training instructions for fine-tuning a T5-based model to perform **multi-intent query decomposition** — converting natural user queries into structured sub-queries, each with its associated semantic intent.
+
+---
+
+## 📊 Dataset
+
+The dataset is available for download from:
+
+🔗 [Google Drive Link](https://drive.google.com/file/d/12jXaMwgx4YbYZTgi9ntA1pDhUcGMrODq/view?usp=sharing)
 
 
-## 9. Summary
+
+## 10. Summary
 
 QAnvas provides a powerful natural language interface for the Canvas learning management system, enabling users to easily access course-related information. It combines modern LLM technology, vector search, and structured database queries to offer an intelligent assistant solution for educational environments. By determining the most relevant search paths and using precise search tools, the agent can deliver accurate and helpful responses tailored to user queries. 
