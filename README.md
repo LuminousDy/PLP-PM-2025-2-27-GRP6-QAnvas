@@ -206,6 +206,9 @@ The dataset is available for download from:
 
 🔗 [Google Drive Link](https://drive.google.com/file/d/12jXaMwgx4YbYZTgi9ntA1pDhUcGMrODq/view?usp=sharing)
 
+## Model
+The finetuned model for download from:
+🔗 [T5 specific for query decompostion-after finetuned](https://drive.google.com/drive/folders/1MZUM5gPLVdk6LgtQ8nEBnXUyiMmcYbg6?usp=drive_link)
 
 
 ## 10. Summary
