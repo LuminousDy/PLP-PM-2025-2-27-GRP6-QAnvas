@@ -3,6 +3,8 @@ from pathlib import Path
 from core.api.canvas_api import get_all_available_courses, get_course_data
 from core.processors.data_processors import store_course_data
 from dotenv import load_dotenv
+from tqdm import tqdm
+
 load_dotenv()
 def setup_environment():
     """Setup necessary directories and environment variables"""
@@ -36,7 +38,7 @@ def main():
         print(f"Found {len(available_courses)} available courses")
         
         # Get and store data for each course
-        for course in available_courses:
+        for course in tqdm(available_courses, desc="Processing courses", unit="course"):
             course_id = course['id']
             print(f"\nProcessing course: {course['name']} (ID: {course_id})")
             

@@ -2,6 +2,15 @@ import requests
 import os
 from pathlib import Path
 from typing import Dict
+import logging
+import tqdm
+
+# Configure logging
+logging.basicConfig(
+    filename='storage.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+)
 
 class FileStorage:
     def __init__(self, base_path: str = None):
@@ -51,11 +60,11 @@ class FileStorage:
         Download and store file
         """
         try:
-            print(f"Downloading file: {filename} from URL: {file_url}")
+            logging.info(f"Downloading file: {filename} from URL: {file_url}")
             
             # Determine storage path
             file_path = self.get_storage_path(course_id, folder_path, filename)
-            print(f"Storage path: {file_path}")
+            logging.info(f"Storage path: {file_path}")
             
             # Create a session for maintaining cookies and auth state
             session = requests.Session()
@@ -64,12 +73,12 @@ class FileStorage:
             if headers:
                 session.headers.update(headers)
             
-            print(f"Starting download from {file_url}")
+            logging.info(f"Starting download from {file_url}")
             # Canvas API authenticated URL automatically handles authentication, no extra headers needed
             response = session.get(file_url, stream=True, allow_redirects=True, verify=True)
             
             if not response.ok:
-                print(f"Download failed: Status code {response.status_code}")
+                logging.info(f"Download failed: Status code {response.status_code}")
                 return {
                     "status": "error",
                     "error": f"Download request failed with status code {response.status_code}"
@@ -78,34 +87,38 @@ class FileStorage:
             # Get content length if available
             content_length = response.headers.get('content-length')
             file_size = int(content_length) if content_length else 0
-            print(f"File size from headers: {file_size} bytes")
+            logging.info(f"File size from headers: {file_size} bytes")
             
             if file_size > self.max_file_size and file_size > 0:
-                print(f"File too large: {file_size} bytes (max: {self.max_file_size})")
+                logging.info(f"File too large: {file_size} bytes (max: {self.max_file_size})")
                 return {
                     "status": "size_limit",
                     "file_size": file_size
                 }
             
             # Write the file in chunks
-            with open(file_path, 'wb') as f:
-                downloaded_size = 0
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded_size += len(chunk)
-                print(f"Downloaded {downloaded_size} bytes for file {filename}")
+            total = int(response.headers.get('content-length', 0))
+            
+            with tqdm.tqdm(total=total, unit='B', unit_scale=True, desc=filename, leave=False) as pbar:
+                with open(file_path, 'wb') as f:
+                    downloaded_size = 0
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded_size += len(chunk)
+                            pbar.update(len(chunk))
+                    logging.info(f"Downloaded {downloaded_size} bytes for file {filename}")
             
             # Verify file was actually downloaded
             actual_size = os.path.getsize(file_path)
             if actual_size == 0:
-                print(f"WARNING: Downloaded file is empty: {file_path}")
+                logging.info(f"WARNING: Downloaded file is empty: {file_path}")
                 return {
                     "status": "error",
                     "error": "Downloaded file is empty"
                 }
             
-            print(f"Successfully downloaded file to {file_path} ({actual_size} bytes)")
+            logging.info(f"Successfully downloaded file to {file_path} ({actual_size} bytes)")
             return {
                 "status": "success",
                 "stored_path": str(file_path),
@@ -113,19 +126,19 @@ class FileStorage:
             }
             
         except requests.exceptions.RequestException as e:
-            print(f"Request error downloading {filename}: {str(e)}")
+            logging.error(f"Request error downloading {filename}: {str(e)}")
             return {
                 "status": "error",
                 "error": str(e)
             }
         except IOError as e:
-            print(f"IO error writing file {filename}: {str(e)}")
+            logging.error(f"IO error writing file {filename}: {str(e)}")
             return {
                 "status": "error",
                 "error": str(e)
             }
         except Exception as e:
-            print(f"Unexpected error downloading {filename}: {str(e)}")
+            logging.error(f"Unexpected error downloading {filename}: {str(e)}")
             return {
                 "status": "error",
                 "error": str(e)

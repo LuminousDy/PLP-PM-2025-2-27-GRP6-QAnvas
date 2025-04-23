@@ -1,12 +1,20 @@
+import logging
 from datetime import datetime
 from typing import List, Dict, Any
 from core.storage.file_storage import FileStorage
 from core.db.mongodb import (
-    folder_collection, file_collection, 
+    folder_collection, file_collection,
     assignment_collection, announcement_collection,
     course_collection
 )
 from core.api.canvas_api import HEADERS, get_file_download_url
+
+# Configure logging
+logging.basicConfig(
+    filename='data_processors.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+)
 
 def process_folder_structure(course_id: Any, folders_data: List[Dict]) -> None:
     """
@@ -54,7 +62,7 @@ def store_file(file_item: Dict, course_id: Any) -> None:
     canvas_file_id = file_item.get("id")
     canvas_course_id = file_item.get("course_id")
     
-    print(f"Processing file: {filename} (ID: {canvas_file_id})")
+    logging.info(f"Processing file: {filename} (ID: {canvas_file_id})")
     
     # Basic file information
     file_doc = {
@@ -79,7 +87,7 @@ def store_file(file_item: Dict, course_id: Any) -> None:
         auth_download_url = get_file_download_url(canvas_file_id, canvas_course_id)
         
         if auth_download_url:
-            print(f"Got authenticated download URL for {filename}")
+            logging.info(f"Got authenticated download URL for {filename}")
             
             # Download the file using the authenticated URL
             storage_result = storage.store_file(
@@ -94,21 +102,21 @@ def store_file(file_item: Dict, course_id: Any) -> None:
             file_doc["used_auth_url"] = True
             
             if storage_result["status"] == "success":
-                print(f"Successfully downloaded {filename} using authenticated URL")
+                logging.info(f"Successfully downloaded {filename} using authenticated URL")
                 if "stored_path" in storage_result:
                     file_doc["local_path"] = storage_result["stored_path"]
                 if "file_size" in storage_result:
                     file_doc["downloaded_size"] = storage_result["file_size"]
             else:
-                print(f"Failed to download using authenticated URL: {storage_result.get('error', 'Unknown error')}")
+                logging.info(f"Failed to download using authenticated URL: {storage_result.get('error', 'Unknown error')}")
                 if "error" in storage_result:
                     file_doc["storage_error"] = storage_result["error"]
         else:
-            print(f"Could not get authenticated download URL for file {filename}")
+            logging.info(f"Could not get authenticated download URL for file {filename}")
             file_doc["storage_status"] = "error"
             file_doc["storage_error"] = "Failed to get authenticated download URL"
     else:
-        print(f"Missing Canvas file ID or course ID for {filename}")
+        logging.info(f"Missing Canvas file ID or course ID for {filename}")
         file_doc["storage_status"] = "error"
         file_doc["storage_error"] = "Missing Canvas file ID or course ID"
     

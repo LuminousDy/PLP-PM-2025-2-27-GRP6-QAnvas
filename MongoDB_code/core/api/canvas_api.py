@@ -1,9 +1,16 @@
 import os
 import requests
+import logging
 from time import sleep
 from typing import List, Dict, Any
 from dotenv import load_dotenv
 load_dotenv()
+
+logging.basicConfig(
+    filename='canvas_api.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+)
 
 # API Configuration
 BASE_URL = os.getenv('CANVAS_API_URL')
@@ -45,9 +52,9 @@ def get_paginated_results(url: str) -> List[Dict[Any, Any]] or None:
                 if status == 404 and "discussion_topics" in url and "only_announcements=true" in url:
                     return []
                 if status == 403:
-                    print(f"Permission denied for URL: {paginated_url}")
+                    logging.info(f"Permission denied for URL: {paginated_url}")
                     return None
-            print(f"Error fetching data from {paginated_url}: {str(e)}")
+            logging.error(f"Error fetching data from {paginated_url}: {str(e)}")
             break
             
     return results
@@ -75,13 +82,13 @@ def get_course_data(course_id: int) -> Dict[str, Any] or None:
         response.raise_for_status()
         course_data['details'] = response.json()
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching course details for course {course_id}: {str(e)}")
+        logging.error(f"Error fetching course details for course {course_id}: {str(e)}")
         return None
         
     # Get folders first to establish structure
     folders_data = get_paginated_results(endpoints['folders'])
     if folders_data is None:
-        print(f"Permission denied for folders in course {course_id}. Stopping crawl for this course.")
+        logging.info(f"Permission denied for folders in course {course_id}. Stopping crawl for this course.")
         return None
     course_data['folders'] = folders_data
         
@@ -90,7 +97,7 @@ def get_course_data(course_id: int) -> Dict[str, Any] or None:
         if resource not in ['details', 'folders']:
             data = get_paginated_results(url)
             if data is None:
-                print(f"Permission denied for resource '{resource}' in course {course_id}. Stopping crawl for this course.")
+                logging.info(f"Permission denied for resource '{resource}' in course {course_id}. Stopping crawl for this course.")
                 return None
                 
             # If this is files data, associate with folders
@@ -109,15 +116,13 @@ def get_course_data(course_id: int) -> Dict[str, Any] or None:
                     
                     # Get download URL for each file
                     try:
-                        print(f"Getting download URL for file: {file_item.get('display_name', 'Unknown')} (ID: {file_item.get('id')})")
-                        
+                        logging.info(f"Getting download URL for file: {file_item.get('display_name', 'Unknown')} (ID: {file_item.get('id')})")
                         # Even if a URL already exists, fetch again to ensure complete download information
                         file_id = file_item.get('id')
                         if file_id:
                             # Get file details, including download link
                             file_url = f"{BASE_URL}/courses/{course_id}/files/{file_id}"
-                            print(f"Requesting file details from: {file_url}")
-                            
+                            logging.info(f"Requesting file details from: {file_url}")
                             # Using Session for better connection handling
                             session = requests.Session()
                             session.headers.update(HEADERS)
@@ -129,11 +134,10 @@ def get_course_data(course_id: int) -> Dict[str, Any] or None:
                                 # Store all available URLs for this file
                                 if 'url' in file_details:
                                     file_item['url'] = file_details['url']
-                                    print(f"Got URL: {file_details['url']}")
+                                    logging.info(f"Got URL: {file_details['url']}")
                                 if 'download_url' in file_details:
                                     file_item['download_url'] = file_details['download_url']
-                                    print(f"Got download_url: {file_details['download_url']}")
-                                    
+                                    logging.info(f"Got download_url: {file_details['download_url']}")
                                 # Check for additional Canvas API specific fields
                                 for key in ['preview_url', 'canvadoc_url']:
                                     if key in file_details:
@@ -143,16 +147,15 @@ def get_course_data(course_id: int) -> Dict[str, Any] or None:
                                 if not file_item.get('download_url') and not file_item.get('url'):
                                     # Try to construct a direct download URL using the file ID
                                     direct_download_url = f"{BASE_URL}/courses/{course_id}/files/{file_id}/download"
-                                    print(f"Constructed direct download URL: {direct_download_url}")
+                                    logging.info(f"Constructed direct download URL: {direct_download_url}")
                                     file_item['constructed_download_url'] = direct_download_url
                                     
-                                print(f"Available URLs for {file_item.get('display_name', 'Unknown')}: {[k for k in file_item.keys() if 'url' in k]}")
+                                logging.info(f"Available URLs for {file_item.get('display_name', 'Unknown')}: {[k for k in file_item.keys() if 'url' in k]}")
                             else:
-                                print(f"Failed to get file details. Status: {file_response.status_code}, Response: {file_response.text[:200]}")
-                                
+                                logging.info(f"Failed to get file details. Status: {file_response.status_code}, Response: {file_response.text[:200]}")
                             sleep(RATE_LIMIT_DELAY)  # Respect API rate limit
                     except Exception as e:
-                        print(f"Error getting file details for file {file_item.get('id')}: {str(e)}")
+                        logging.error(f"Error getting file details for file {file_item.get('id')}: {str(e)}")
                     
             course_data[resource] = data
             
@@ -166,7 +169,7 @@ def get_all_available_courses() -> List[Dict]:
     courses = get_paginated_results(url)
     
     if courses is None:
-        print("Failed to get courses. Please check API key and permissions.")
+        logging.info("Failed to get courses. Please check API key and permissions.")
         return []
         
     # Only keep active courses
@@ -185,11 +188,11 @@ def get_file_download_url(file_id: int, course_id: int) -> str or None:
     try:
         # Use the Canvas API's dedicated file download interface
         download_url = f"{BASE_URL}/courses/{course_id}/files/{file_id}?include[]=download_url"
-        print(f"Getting authenticated download URL for file ID {file_id}")
+        logging.info(f"Getting authenticated download URL for file ID {file_id}")
         
         response = requests.get(download_url, headers=HEADERS)
         if not response.ok:
-            print(f"Failed to get download URL. Status: {response.status_code}")
+            logging.info(f"Failed to get download URL. Status: {response.status_code}")
             return None
             
         file_data = response.json()
@@ -198,11 +201,11 @@ def get_file_download_url(file_id: int, course_id: int) -> str or None:
         if "url" in file_data:
             # This URL already contains authentication information
             authenticated_url = file_data.get("url")
-            print(f"Got authenticated URL: {authenticated_url[:100]}...")
+            logging.info(f"Got authenticated URL: {authenticated_url[:100]}...")
             return authenticated_url
         else:
-            print("No URL found in file data")
+            logging.info("No URL found in file data")
             return None
     except Exception as e:
-        print(f"Error getting download URL: {str(e)}")
+        logging.error(f"Error getting download URL: {str(e)}")
         return None 
