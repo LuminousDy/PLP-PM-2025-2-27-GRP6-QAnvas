@@ -74,7 +74,7 @@ QAnvas/
 │   ├── tools/
 │   │   ├── canvas_search.py     # Canvas content search functionality
 │   │   └── pdf_analyzer.py      # PDF document analysis functionality
-│   │   └── mutil_intents_analyze.py      # Query analysis and spliting
+│   │   └── multi_intents_decompostion.py      # Query analysis and spliting
 │   └── Agent_Module_Summary.md
 ```
 
@@ -82,14 +82,30 @@ QAnvas/
 
 ## 5. Key Implementation Details
 
-### 5.1 Pagination Handling
+### 5.1 Query Decomposition
+Our system supports **multi-intent query decomposition**, allowing users to issue complex, natural language queries involving multiple information needs. For example, consider the user query:
+
+> _“I missed Prof. Wong’s last lecture, so I’m not sure if we’re still presenting next Monday or if it got postponed. Also, I heard the final is now open-book — is that true? And where are the updated slides uploaded?”_
+
+This is automatically decomposed into the following sub-queries:
+
+1. **`presentation_schedule`** — _Are we still presenting next Monday for Prof. Wong's class, or has it been postponed?_
+2. **`exam_format`** — _Is the final exam for Prof. Wong's class open-book?_
+3. **`lecture_notes`** — _Where are the updated lecture slides for Prof. Wong's class uploaded?_
+
+Each sub-query is enriched through contextual disambiguation (e.g., resolving “it” to "presentation", “the final” to the course exam) and routed to the appropriate handler. This enables:
+- Precise handling of implicit references and cross-sentence dependencies
+- Parallel querying and result synthesis from multiple APIs
+- A more natural and fluent user experience with minimal need for query rewriting
+
+### 5.2 Pagination Handling
 Canvas API interfaces typically return paginated data, which our system handles by:
 - Automatically detecting and processing Canvas API's `Link` header information
 - Recursively or iteratively requesting all available pages
 - Merging paginated results into a single dataset
 - Implementing backpressure mechanisms to prevent request overload
 
-### 5.2 Vector Search Implementation
+### 5.3 Vector Search Implementation
 ```python
 # Generate embedding for query
 query_embedding = self.model.encode([query], prompt_name="query", 
@@ -106,7 +122,7 @@ similarities = np.dot(normalized_doc_embeddings, normalized_query_embedding)
 top_indices = np.argsort(-similarities)[:top_k]
 ```
 
-### 5.3 ReAct Agent Implementation
+### 5.4 ReAct Agent Implementation
 ```python
 self.agent = create_react_agent(
     llm=self.llm,
