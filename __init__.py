@@ -1,3 +1,0 @@
-"""
-Canvas QA Agent package
-""" 

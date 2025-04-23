@@ -59,4 +59,4 @@ def prompt_analyze(input_text, model, tokenizer, max_length=128):
     # Parse structured output
     query_store = parse_multi_intent_output(decoded_output, original_query=input_text)
     prompts = [q['text'] for q in query_store['sub_queries']]
-    return query_store,prompts
+    return query_store
