@@ -15,6 +15,7 @@ from langchain.prompts import PromptTemplate
 from langchain_core.memory import BaseMemory
 from langchain.memory import ConversationBufferMemory
 from langchain.schema import SystemMessage, HumanMessage, AIMessage
+from tools.multi_intents_decomposition import prompt_analyze
 
 from config.settings import (
     MONGODB_URI, 
@@ -34,6 +35,8 @@ os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 # Directory for storing conversation history
 CONVERSATION_DIR = os.path.join(os.path.dirname(__file__), "conversations")
 os.makedirs(CONVERSATION_DIR, exist_ok=True)
+model = AutoModelForSeq2SeqLM.from_pretrained("path_to_your_model")
+tokenizer = AutoTokenizer.from_pretrained("path_to_your_model")
 
 class ConversationManager:
     """Manager for conversation history"""
@@ -308,40 +311,42 @@ def main():
             prompt = "\nEnter your question (or 'quit' to exit): "
             
         query = input(prompt)
-        
-        # Check for exit command
-        if query.lower() == 'quit':
-            break
+        sub_querys_stores=prompt_analyze(query, model,tokenizer)
+        for i, sub_query in enumerate(sub_querys_stores['sub_queries']):
+            # Check for exit command
+            query = sub_query['text']
+            if query.lower() == 'quit':
+                break
+                
+            # Check for session command
+            if query.lower().startswith('session:'):
+                parts = query.split(':', 1)
+                if len(parts) > 1 and parts[1].strip():
+                    current_conversation_id = parts[1].strip()
+                    print(f"Switched to session: {current_conversation_id}")
+                else:
+                    print("Invalid session ID format. Please use 'session:your_session_id'")
+                continue
             
-        # Check for session command
-        if query.lower().startswith('session:'):
-            parts = query.split(':', 1)
-            if len(parts) > 1 and parts[1].strip():
-                current_conversation_id = parts[1].strip()
-                print(f"Switched to session: {current_conversation_id}")
-            else:
-                print("Invalid session ID format. Please use 'session:your_session_id'")
-            continue
-        
-        # Check for new session command
-        if query.lower() == 'new':
-            current_conversation_id = None
-            print("Started a new conversation session")
-            continue
+            # Check for new session command
+            if query.lower() == 'new':
+                current_conversation_id = None
+                print("Started a new conversation session")
+                continue
+                
+            print("\nProcessing your query...\n")
             
-        print("\nProcessing your query...\n")
-        
-        # Process the query
-        result = agent.answer_query(query, current_conversation_id)
-        
-        # Update conversation ID if this was a new conversation
-        if not current_conversation_id:
-            current_conversation_id = result["conversation_id"]
-            print(f"\nNew conversation started with ID: {current_conversation_id}")
-        
-        # Display the answer
-        print(f"\nAnswer: {result['answer']}\n")
-        print("-" * 50)
+            # Process the query
+            result = agent.answer_query(query, current_conversation_id)
+            
+            # Update conversation ID if this was a new conversation
+            if not current_conversation_id:
+                current_conversation_id = result["conversation_id"]
+                print(f"\nNew conversation started with ID: {current_conversation_id}")
+            
+            # Display the answer
+            print(f"\nAnswer: {result['answer']}\n")
+            print("-" * 50)
 
 if __name__ == "__main__":
     main()
