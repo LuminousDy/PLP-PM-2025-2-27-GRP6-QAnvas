@@ -18,11 +18,12 @@ except Exception as e:
     exit(1)
 
 # Collections for different data types
-course_collection = db["courses"]
-file_collection = db["files"]
-folder_collection = db["folders"]
-assignment_collection = db["assignments"]
-announcement_collection = db["announcements"]
+course_collection = db["courses"] # no updated_at field
+file_collection = db["files"] # has updated_at field
+folder_collection = db["folders"] # has updated_at field
+assignment_collection = db["assignments"] # has updated_at field
+announcement_collection = db["announcements"] # no updated_at field
+quiz_collection = db["quizzes"]  # no updated_at field
 query_log_collection = db["query_logs"]
 
 # Create indexes for better query performance

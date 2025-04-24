@@ -158,7 +158,7 @@ def get_course_data(course_id: int) -> Dict[str, Any] or None:
                         logging.error(f"Error getting file details for file {file_item.get('id')}: {str(e)}")
                     
             course_data[resource] = data
-            
+    logging.info('course id' + str(course_id) + ' data: ' + str(course_data))
     return course_data
 
 def get_all_available_courses() -> List[Dict]:
@@ -177,8 +177,8 @@ def get_all_available_courses() -> List[Dict]:
         course for course in courses 
         if course.get('workflow_state') == 'available'
     ]
-    
-    return active_courses 
+    logging.info('active courses:' + str(active_courses))
+    return active_courses
 
 def get_file_download_url(file_id: int, course_id: int) -> str or None:
     """

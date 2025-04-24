@@ -5,7 +5,7 @@ from core.storage.file_storage import FileStorage
 from core.db.mongodb import (
     folder_collection, file_collection,
     assignment_collection, announcement_collection,
-    course_collection
+    course_collection, quiz_collection,
 )
 from core.api.canvas_api import HEADERS, get_file_download_url
 
@@ -15,17 +15,34 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
 )
+def is_course_in_db(course_id: int) -> bool:
+    return bool(course_collection.find_one({"course_id": course_id}))
 
-def process_folder_structure(course_id: Any, folders_data: List[Dict]) -> None:
+def add_folder_to_db(db_id: Any, folders_data: List[Dict]) -> None:
     """
     Process and store course folder structure
     """
     def process_folder(folder: Dict, parent_path: str = "") -> Dict:
         folder_path = f"{parent_path}/{folder['name']}" if parent_path else folder['name']
         
-        folder_doc = {
-            "course_id": course_id,
+        existing = folder_collection.find_one({
+            "course_id": folder.get("course_id"),
             "canvas_id": folder.get("id"),
+            "full_path": folder_path,
+        })
+        update = False
+        if existing:
+            if folder.get("updated_at") == existing.get("updated_at"):
+                # Skip if the folder has not been updated
+                logging.info(f"Skip folder: {folder_path}")
+                return False
+            else:
+                update = True
+        
+        folder_doc = {
+            # "db_id": db_id,
+            "canvas_id": folder.get("id"),
+            "course_id": folder.get("course_id"),
             "name": folder.get("name"),
             "full_path": folder_path,
             "parent_folder_id": folder.get("parent_folder_id"),
@@ -33,42 +50,56 @@ def process_folder_structure(course_id: Any, folders_data: List[Dict]) -> None:
             "files_count": len(folder.get("files", [])),
             "created_at": folder.get("created_at"),
             "updated_at": folder.get("updated_at"),
-            "stored_at": datetime.now()
+            "stored_at": datetime.now(),
         }
         
-        # Store folder information
-        folder_collection.insert_one(folder_doc)
-        
-        # Process subfolders recursively
-        for subfolder in folder.get("folders", []):
-            process_folder(subfolder, folder_path)
-            
-        return folder_doc
+        if update:
+            folder_collection.update_one(
+                {"_id": existing["_id"]},
+                {"$set": folder_doc}
+            )
+            logging.info(f"Updated folder: {folder_path}")
+        else:
+            folder_collection.insert_one(folder_doc)
+            logging.info(f"Stored folder: {folder_path}")
+        return True
 
     # Process all top-level folders
+    update_status = False
     for folder in folders_data:
-        process_folder(folder)
+        update_status = process_folder(folder) or update_status
 
-def store_file(file_item: Dict, course_id: Any) -> None:
+    return update_status
+
+def store_file_and_add_to_db(file_item: Dict, db_id: Any) -> None:
     """
     Store file metadata and content with folder information
     """
+    course_id = file_item.get("course_id")
+    canvas_id = file_item.get("id")
+    update = False
+    existing = file_collection.find_one({
+        "course_id": course_id,
+        "canvas_id": canvas_id,
+    })
+    if existing:
+        if file_item.get("updated_at") == existing.get("updated_at"):
+            logging.info(f"Skip file: {file_item['filename']}")
+            return False
+        else:
+            update = True
+
     # Get file storage instance
     storage = FileStorage()
-    
-    # Build file path information
     folder_path = file_item.get("folder", {}).get("full_name", "")
     filename = file_item.get("filename", "")
-    canvas_file_id = file_item.get("id")
-    canvas_course_id = file_item.get("course_id")
-    
-    logging.info(f"Processing file: {filename} (ID: {canvas_file_id})")
+    logging.info(f"Processing file: {filename} (ID: {canvas_id})")
     
     # Basic file information
     file_doc = {
+        # "db_id": db_id,
+        "canvas_id": canvas_id,
         "course_id": course_id,
-        "canvas_id": canvas_file_id,
-        "canvas_course_id": canvas_course_id,
         "filename": filename,
         "display_name": file_item.get("display_name", ""),
         "folder_path": folder_path,
@@ -78,13 +109,13 @@ def store_file(file_item: Dict, course_id: Any) -> None:
         "url": file_item.get("url", ""),
         "created_at": file_item.get("created_at", ""),
         "updated_at": file_item.get("updated_at", ""),
-        "stored_at": datetime.now()
+        "stored_at": datetime.now(),
     }
     
     # Get authenticated download URL through Canvas API
-    if canvas_file_id and canvas_course_id:
+    if canvas_id and course_id:
         # Get the authenticated file download URL from Canvas API
-        auth_download_url = get_file_download_url(canvas_file_id, canvas_course_id)
+        auth_download_url = get_file_download_url(canvas_id, course_id)
         
         if auth_download_url:
             logging.info(f"Got authenticated download URL for {filename}")
@@ -92,7 +123,7 @@ def store_file(file_item: Dict, course_id: Any) -> None:
             # Download the file using the authenticated URL
             storage_result = storage.store_file(
                 auth_download_url,
-                str(course_id),
+                str(db_id),
                 folder_path,
                 filename,
                 {} # This URL already contains authentication, no additional headers needed
@@ -120,15 +151,38 @@ def store_file(file_item: Dict, course_id: Any) -> None:
         file_doc["storage_status"] = "error"
         file_doc["storage_error"] = "Missing Canvas file ID or course ID"
     
-    # Store in database
-    file_collection.insert_one(file_doc)
 
-def store_assignment(assignment_item: Dict, course_id: Any) -> None:
+    if update:
+        file_collection.update_one(
+            {"_id": existing["_id"]},
+            {"$set": file_doc}
+        )
+        logging.info(f"Updated file: {filename} (ID: {canvas_id})")
+    else:
+        file_collection.insert_one(file_doc)
+        logging.info(f"Stored file: {filename} (ID: {canvas_id})")
+
+    return True
+
+def add_assignment_to_db(assignment_item: Dict, db_id: Any) -> bool:
     """
     Store assignment data in MongoDB
     """
-    assignment_collection.insert_one({
-        "course_id": course_id,
+    existing = assignment_collection.find_one({
+        "course_id": assignment_item.get("course_id"),
+        "canvas_id": assignment_item["id"]
+    })
+    update = False
+    if existing:
+        if assignment_item.get("updated_at") == existing.get("updated_at"):
+            logging.info(f"Skip assignment: {assignment_item['name']}")
+            return False
+        else:
+            update = True
+
+    assignment_doc = {
+        # "db_id": db_id,
+        "course_id": assignment_item.get("course_id"),
         "canvas_id": assignment_item["id"],
         "name": assignment_item.get("name", ""),
         "description": assignment_item.get("description", ""),
@@ -136,31 +190,82 @@ def store_assignment(assignment_item: Dict, course_id: Any) -> None:
         "points_possible": assignment_item.get("points_possible", 0),
         "submission_types": assignment_item.get("submission_types", []),
         "html_url": assignment_item.get("html_url", ""),
-        "stored_at": datetime.now()
-    })
+        "updated_at": assignment_item.get("updated_at", ""),
+        "stored_at": datetime.now(),
+    }
+    if update == True:
+        assignment_collection.update_one(
+            {"_id": existing["_id"]},
+            {"$set": assignment_doc}
+        )
+        logging.info(f"Updated assignment: {assignment_item['name']}")
+    else:
+        assignment_collection.insert_one(assignment_doc)
+        logging.info(f"Stored assignment: {assignment_item['name']}")
+    
+    return True
 
-def store_announcement(announcement_item: Dict, course_id: Any) -> None:
+def add_announcement_to_db(announcement_item: Dict, db_id: Any) -> None:
     """
     Store announcement data in MongoDB
     """
+    existing = announcement_collection.find_one({
+        "course_id": announcement_item.get("course_id"),
+        "canvas_id": announcement_item["id"]
+    })
+    if existing:
+        logging.info(f"Skip announcement: {announcement_item['title']}")
+        return False
+
     announcement_collection.insert_one({
-        "course_id": course_id,
+        # "db_id": db_id,
         "canvas_id": announcement_item["id"],
+        "course_id": announcement_item.get("course_id"),
         "title": announcement_item.get("title", ""),
         "message": announcement_item.get("message", ""),
         "posted_at": announcement_item.get("posted_at", ""),
         "url": announcement_item.get("url", ""),
-        "stored_at": datetime.now()
+        "stored_at": datetime.now(),
     })
+    logging.info(f"Stored announcement: {announcement_item['title']}")
+    return True
+
+def add_quiz_to_db(quiz_item: Dict, db_id: Any) -> None:
+    """
+    Store quiz data in MongoDB
+    """
+    existing = quiz_collection.find_one({
+        "course_id": quiz_item.get("course_id"),
+        "canvas_id": quiz_item["id"]
+    })
+    if existing:
+        logging.info(f"Skip quiz: {quiz_item['title']}")  
+        return False
+    
+    quiz_collection.insert_one({
+        # "db_id": db_id,
+        "course_id": quiz_item.get("course_id"),
+        "canvas_id": quiz_item["id"],
+        "title": quiz_item.get("title", ""),
+        "description": quiz_item.get("description", ""),
+        "due_at": quiz_item.get("due_at", ""),
+        "html_url": quiz_item.get("html_url", ""),
+        "stored_at": datetime.now(),
+    })
+    logging.info(f"Stored quiz: {quiz_item['title']}")
+    return True
 
 def store_course_data(course_data: Dict[str, Any]) -> str:
     """
     Store course metadata and related resources in MongoDB
     """
+    course_id = course_data["details"]["id"]
+    course_name = course_data["details"]["name"]
+
     # Store course details in MongoDB with nested structure
     course_document = {
-        "course_name": course_data["details"]["name"],
-        "canvas_id": course_data["details"]["id"],
+        "course_name": course_name,
+        "course_id": course_id,
         "course_code": course_data["details"].get("course_code", ""),
         "start_at": course_data["details"].get("start_at", ""),
         "end_at": course_data["details"].get("end_at", ""),
@@ -170,33 +275,49 @@ def store_course_data(course_data: Dict[str, Any]) -> str:
             "assignments_count": 0,
             "announcements_count": 0
         },
-        "stored_at": datetime.now()
+        # "updated_at": datetime.now(),
+        "status": "in_progress", # done, in_progress, error
     }
     
-    course_id = course_collection.insert_one(course_document).inserted_id
+    # Check if course already exists in the database
+    if is_course_in_db(course_id):
+        logging.info(f"Course {course_data['details']['id']} already exists. Updating...")
+        # print(f"Course {course_data['details']['id']} already exists. Updating...")
+        db_id = course_collection.find_one({"course_id": course_id})["_id"]
+        # course_collection.update_one({"course_id": course_data["details"]["id"]}, {"$set": course_document})
+    else:
+        logging.info(f"Storing new course {course_data['details']['id']}...")
+        # print(f"Storing new course {course_data['details']['id']}...")
+        db_id = course_collection.insert_one(course_document).inserted_id
     
     # Process and store folder structure first
     if "folders" in course_data:
-        process_folder_structure(course_id, course_data["folders"])
+        add_folder_to_db(db_id, course_data["folders"])
         course_document["resources"]["folders_count"] = len(course_data["folders"])
     
     # Store different resource types with appropriate handlers
     resource_handlers = {
-        "files": store_file,
-        "assignments": store_assignment,
-        "announcements": store_announcement
+        "assignments": add_assignment_to_db,
+        "announcements": add_announcement_to_db,
+        "quizzes": add_quiz_to_db,
+        "files": store_file_and_add_to_db,
     }
     
     for resource_type, handler in resource_handlers.items():
         if resource_type in course_data:
             items = course_data[resource_type]
             for item in items:
-                handler(item, course_id)
+                handler(item, db_id)
             
             # Update resource counts in course document
             course_collection.update_one(
-                {"_id": course_id},
+                {"_id": db_id},
                 {"$set": {f"resources.{resource_type}_count": len(items)}}
             )
     
-    return str(course_id) 
+    # Update course status to "done"
+    course_collection.update_one(
+        {"_id": db_id},
+        {"$set": {"status": "done"}}
+    )
+    return str(db_id)
