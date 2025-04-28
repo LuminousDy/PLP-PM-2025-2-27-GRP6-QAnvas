@@ -209,7 +209,7 @@ The dataset is available for download from:
 ## Model
 The finetuned model for download from:
 
-🔗 [T5 specific for query decompostion-after finetuned](https://drive.google.com/drive/folders/1MZUM5gPLVdk6LgtQ8nEBnXUyiMmcYbg6?usp=drive_link)
+🔗 [T5 specific for query decompostion-after finetuned](https://drive.google.com/drive/folders/1baHEWHc1Le9Sar34qMwC02htUIhQHxOZ?usp=sharing).
 
 and put it under the 
 ```
