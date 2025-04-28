@@ -4,7 +4,7 @@ Configuration settings for the Canvas QA Agent
 import os
 from typing import List
 from pymongo import MongoClient
-
+import argparse
 # MongoDB configuration
 MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017/DINGYI_CANVAS_DATA")
 MONGODB_DB_NAME = "canvas_qa_system"  # Changed to match your actual database name
@@ -65,3 +65,10 @@ COLLECTION_FIELDS = {
     "files": ["_id", "course_id", "file_name", "folder_path", "size", "url", "created_at", "updated_at", 
               "storage_status", "local_path"]
 }
+
+def get_args():
+    parser = argparse.ArgumentParser(description="Inference multiple intents")
+    # === Output and Logging ===
+    parser.add_argument('--max_length', type=int, default=128, help="Maximum length of the generated sequence") 
+    parser.add_checkpoints('--model_path', type=str, default="/media/labpc2x2080ti/data/Mohan_Workspace/checkpoint-225000",)
+    return parser.parse_args()

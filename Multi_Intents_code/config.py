@@ -30,6 +30,6 @@ def get_args():
 
     # === Inference Parameters ===
     parser.add_argument('--max_length', type=int, default=128, help="Maximum length of the generated sequence") 
-    parser.add_checkpoints('--model_path', type=str, default="/content/drive/MyDrive/EBA5004/t5-multi-intentv2/t5-multi-intent-v3/checkpoint-4500",)
+    parser.add_checkpoints('--model_path', type=str, default="/media/labpc2x2080ti/data/Mohan_Workspace/checkpoint-225000",)
     return parser.parse_args()
 
