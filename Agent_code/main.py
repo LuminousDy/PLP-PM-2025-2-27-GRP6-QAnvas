@@ -15,17 +15,17 @@ from langchain.prompts import PromptTemplate
 from langchain_core.memory import BaseMemory
 from langchain.memory import ConversationBufferMemory
 from langchain.schema import SystemMessage, HumanMessage, AIMessage
-from tools.multi_intents_decomposition import prompt_analyze
+from .tools.multi_intents_decomposition import prompt_analyze
 
-from config.settings import (
+from .config.settings import (
     MONGODB_URI, 
     GEMINI_API_KEY,
     GEMINI_MODEL_NAME
 )
-from tools.canvas_search import CanvasSearcher
-from tools.pdf_analyzer import PDFAnalyzer
-from prompts.templates import SEARCH_PATH_TEMPLATE, FINAL_ANSWER_TEMPLATE, REACT_PROMPT, CONTEXT_ENHANCED_PROMPT
-from models.data_models import SearchPath, Conversation
+from .tools.canvas_search import CanvasSearcher
+from .tools.pdf_analyzer import PDFAnalyzer
+from .prompts.templates import SEARCH_PATH_TEMPLATE, FINAL_ANSWER_TEMPLATE, REACT_PROMPT, CONTEXT_ENHANCED_PROMPT
+from .models.data_models import SearchPath, Conversation
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"

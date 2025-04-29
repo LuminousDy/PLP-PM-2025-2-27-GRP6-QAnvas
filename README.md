@@ -74,7 +74,7 @@ QAnvas/
 │   ├── tools/
 │   │   ├── canvas_search.py     # Canvas content search functionality
 │   │   └── pdf_analyzer.py      # PDF document analysis functionality
-│   │   └── multi_intents_decompostion.py      # Query analysis and spliting
+│   │   └── multi_intents_decomposition.py      # Query analysis and spliting
 │   └── Agent_Module_Summary.md
 ```
 
@@ -209,7 +209,7 @@ The dataset is available for download from:
 ## Model
 The finetuned model for download from:
 
-🔗 [T5 specific for query decompostion-after finetuned](https://drive.google.com/drive/folders/1baHEWHc1Le9Sar34qMwC02htUIhQHxOZ?usp=sharing).
+🔗 [T5 specific for query decomposition-after finetuned](https://drive.google.com/drive/folders/1baHEWHc1Le9Sar34qMwC02htUIhQHxOZ?usp=sharing).
 
 and put it under the 
 ```

@@ -8,8 +8,8 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import torch
-from config.settings import PDF_BASE_PATH, CHUNK_SIZE, CHUNK_OVERLAP, EMBEDDING_MODEL_NAME
-from models.data_models import PDFAnalysisResult
+from Agent_code.config.settings import PDF_BASE_PATH, CHUNK_SIZE, CHUNK_OVERLAP, EMBEDDING_MODEL_NAME
+from Agent_code.models.data_models import PDFAnalysisResult
 
 class PDFAnalyzer:
     """PDF document analysis tool"""

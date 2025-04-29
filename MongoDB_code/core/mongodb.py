@@ -25,6 +25,7 @@ assignment_collection = db["assignments"] # has updated_at field
 announcement_collection = db["announcements"] # no updated_at field
 quiz_collection = db["quizzes"]  # no updated_at field
 query_log_collection = db["query_logs"]
+meta_col = db['metadata']
 
 # Create indexes for better query performance
 folder_collection.create_index([("course_id", 1), ("full_path", 1)])

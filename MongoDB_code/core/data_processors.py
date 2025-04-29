@@ -1,13 +1,13 @@
 import logging
 from datetime import datetime
 from typing import List, Dict, Any
-from core.storage.file_storage import FileStorage
-from core.db.mongodb import (
+from .file_storage import FileStorage
+from .mongodb import (
     folder_collection, file_collection,
     assignment_collection, announcement_collection,
     course_collection, quiz_collection,
 )
-from core.api.canvas_api import HEADERS, get_file_download_url
+from .api.canvas_api import HEADERS, get_file_download_url
 
 # Configure logging
 logging.basicConfig(

@@ -22,4 +22,13 @@ tqdm>=4.66.1  # Progress bar
 numpy>=1.24.0
 pandas>=2.0.0 
 
-tqdm==4.66.1
+datasets==3.5.1
+langchain_community==0.3.23
+langchain_core==0.3.56
+nltk==3.9.1
+protobuf
+pydantic==2.11.3
+rank_bm25==0.2.2
+sentence_transformers==4.1.0
+torch==2.6.0
+transformers==4.51.3

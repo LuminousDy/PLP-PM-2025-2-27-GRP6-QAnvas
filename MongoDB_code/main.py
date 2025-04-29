@@ -1,9 +1,11 @@
 import os, logging
 from pathlib import Path
-from core.api.canvas_api import get_all_available_courses, get_course_data
-from core.processors.data_processors import store_course_data
+from .core.api.canvas_api import get_all_available_courses, get_course_data
+from .core.data_processors import store_course_data
+from .core.mongodb import meta_col
 from dotenv import load_dotenv
 from tqdm import tqdm
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +28,16 @@ def setup_environment():
             "Please set it before running the script."
         )
 
+def get_last_updated_time():
+    doc = meta_col.find_one({"type": "update_status"})
+    return doc.get("last_updated") if doc else None
+
+def update_last_updated_time():
+    meta_col.update_one(
+        {"type": "update_status"},
+        {"$set": {"last_updated": datetime.utcnow()}},
+        upsert=True
+    )
 def main():
     # Setup environment
     setup_environment()
@@ -57,6 +69,7 @@ def main():
     print(f"\nTotal courses stored: {len(all_courses_data)}")
     for course_id, data in all_courses_data.items():
         print(f"Course {course_id}: {data['details']['name']}")
+    update_last_updated_time()
 
 if __name__ == "__main__":
-    main() 
+    main()

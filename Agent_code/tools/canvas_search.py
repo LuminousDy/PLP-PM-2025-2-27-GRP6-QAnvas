@@ -6,8 +6,8 @@ from typing import Dict, List, Any, Optional
 from sentence_transformers import SentenceTransformer
 from langchain_community.vectorstores import MongoDBAtlasVectorSearch
 from langchain_google_genai import ChatGoogleGenerativeAI
-from models.data_models import SearchPath, SearchResult
-from config.settings import (
+from Agent_code.models.data_models import SearchPath, SearchResult
+from Agent_code.config.settings import (
     EMBEDDING_MODEL_NAME, 
     MONGODB_URI, 
     MONGODB_DB_NAME, 
@@ -18,7 +18,6 @@ from config.settings import (
     COLLECTION_NAMES,
     COLLECTION_FIELDS
 )
-import os
 from pymongo import MongoClient, ASCENDING, TEXT
 import json
 import re
@@ -29,7 +28,7 @@ from nltk.tokenize import word_tokenize
 import nltk
 from datetime import datetime
 from functools import lru_cache
-from mutli_intents_decomposition import prompt_analyze
+from Agent_code.tools.multi_intents_decomposition import prompt_analyze
 # Download NLTK data for tokenization
 try:
     nltk.data.find('tokenizers/punkt')
