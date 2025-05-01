@@ -298,38 +298,38 @@ def main(prompt_input):
     
     # Interactive testing
     print("\nCanvas QA Agent started. Type 'quit' to exit.")
-    print("For a new conversation, just start asking questions.")
-    print("To continue a conversation, enter: 'session:your_session_id'\n")
+    # print("For a new conversation, just start asking questions.")
+    # print("To continue a conversation, enter: 'session:your_session_id'\n")
     
     current_conversation_id = None
     
-    while True:
+    
         # Show current session ID if we have one
         if current_conversation_id:
             prompt = f"\n[Session: {current_conversation_id}] Enter your question (or 'quit' to exit): "
         else:
             prompt = "\nEnter your question (or 'quit' to exit): "
         
-        query = prompt_input
-        sub_querys_stores=prompt_analyze(query, model,tokenizer)
-        for i, sub_query in enumerate(sub_querys_stores['sub_queries']):
-            # Check for exit command
-            query = sub_query['text']
-            if query.lower() == 'quit':
-                break
+    query = prompt_input
+    sub_querys_stores=prompt_analyze(query, model,tokenizer)
+    for i, sub_query in enumerate(sub_querys_stores['sub_queries']):
+        # Check for exit command
+        query = sub_query['text']
+        if query.lower() == 'quit':
+            break
                 
-            # Check for session command
-            if query.lower().startswith('session:'):
-                parts = query.split(':', 1)
-                if len(parts) > 1 and parts[1].strip():
-                    current_conversation_id = parts[1].strip()
-                    print(f"Switched to session: {current_conversation_id}")
-                else:
-                    print("Invalid session ID format. Please use 'session:your_session_id'")
-                continue
+        # Check for session command
+        if query.lower().startswith('session:'):
+            parts = query.split(':', 1)
+            if len(parts) > 1 and parts[1].strip():
+                current_conversation_id = parts[1].strip()
+                print(f"Switched to session: {current_conversation_id}")
+            else:
+                print("Invalid session ID format. Please use 'session:your_session_id'")
+            continue
             
-            # Check for new session command
-            if query.lower() == 'new':
+        # Check for new session command
+        if query.lower() == 'new':
                 current_conversation_id = None
                 print("Started a new conversation session")
                 continue
