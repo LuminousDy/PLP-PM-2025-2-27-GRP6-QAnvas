@@ -18,7 +18,7 @@ COLLECTION_NAMES = {
 }
 
 # API Keys
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "your_gemini_api_key")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "Your_Gemini_API_Key")
 
 # File paths
 PDF_BASE_PATH = "Files_Database"
