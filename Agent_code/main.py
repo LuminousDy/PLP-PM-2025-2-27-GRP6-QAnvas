@@ -293,7 +293,7 @@ class CanvasQAAgent:
                 "conversation_id": conversation_id
             }
             
-def main(prompt_input):
+def main(prompt_input,use_subqueries=False):
     agent = CanvasQAAgent()
     
     # Interactive testing
@@ -304,17 +304,25 @@ def main(prompt_input):
     current_conversation_id = None
     
     
-        # Show current session ID if we have one
-        if current_conversation_id:
-            prompt = f"\n[Session: {current_conversation_id}] Enter your question (or 'quit' to exit): "
-        else:
-            prompt = "\nEnter your question (or 'quit' to exit): "
+    # Show current session ID if we have one
+    # if current_conversation_id:
+    #     prompt = f"\n[Session: {current_conversation_id}] Enter your question (or 'quit' to exit): "
+    # else:
+    #     prompt = "\nEnter your question (or 'quit' to exit): "
         
     query = prompt_input
-    sub_querys_stores=prompt_analyze(query, model,tokenizer)
-    for i, sub_query in enumerate(sub_querys_stores['sub_queries']):
+    # Check for subqueries
+    if use_subqueries:
+        sub_querys_stores = prompt_analyze(prompt_input, model, tokenizer)
+        queries = [sub['text'] for sub in sub_querys_stores['sub_queries']]
+        print(f"Detected {len(queries)} sub-queries.\n")
+    else:
+        queries = [prompt_input.strip()]
+
+    for i, query in enumerate(queries):
         # Check for exit command
-        query = sub_query['text']
+        query = query.strip()
+
         if query.lower() == 'quit':
             break
                 

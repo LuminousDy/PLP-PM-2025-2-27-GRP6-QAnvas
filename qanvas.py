@@ -88,7 +88,7 @@ def run_chat(stdscr):
             break
         # connect to the agent
         try:
-            response = start_chat(user_input)
+            response = start_chat(user_input,use_subqueries=False)
         except Exception as e:
             response = f"[ERROR] {str(e)}"
 
