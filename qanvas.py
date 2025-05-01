@@ -3,8 +3,8 @@ import datetime
 import time
 
 from MongoDB_code.main import main as update_database, get_last_updated_time
-from Agent_code.dummy import main as start_chat #TODO
-# from Agent_code.main import main as start_chat
+# from Agent_code.dummy import main as start_chat #TODO
+from Agent_code.main import main as start_chat # Done
 
 last_updated_time = get_last_updated_time()
 
@@ -81,11 +81,12 @@ def run_chat(stdscr):
         input_win.refresh()
         curses.echo()
         user_input = input_win.getstr(1, 0, 100).decode("utf-8").strip()
+        
         curses.noecho()
 
         if user_input.lower() in ['exit', 'quit']:
             break
-
+        # connect to the agent
         try:
             response = start_chat(user_input)
         except Exception as e:

@@ -293,7 +293,7 @@ class CanvasQAAgent:
                 "conversation_id": conversation_id
             }
             
-def main():
+def main(prompt_input):
     agent = CanvasQAAgent()
     
     # Interactive testing
@@ -309,8 +309,8 @@ def main():
             prompt = f"\n[Session: {current_conversation_id}] Enter your question (or 'quit' to exit): "
         else:
             prompt = "\nEnter your question (or 'quit' to exit): "
-            
-        query = input(prompt)
+        
+        query = prompt_input
         sub_querys_stores=prompt_analyze(query, model,tokenizer)
         for i, sub_query in enumerate(sub_querys_stores['sub_queries']):
             # Check for exit command
